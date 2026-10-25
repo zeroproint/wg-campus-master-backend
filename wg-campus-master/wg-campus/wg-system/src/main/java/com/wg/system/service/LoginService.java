@@ -58,6 +58,7 @@ public class LoginService {
 
     private final IUserWxService walletService;
     private final WalletMapper walletMapper;
+    private final IPointsService pointsService;
 
     private final EmailService emailService;
     /**
@@ -135,6 +136,8 @@ public class LoginService {
                     .setCreateTime(LocalDateTime.now())
                     .setUpdateTime(LocalDateTime.now());
             walletMapper.insert(wallet);
+            //注册赠送积分
+            pointsService.grantRegisterGift(user.getUid());
         }
         else {
             //正式查询

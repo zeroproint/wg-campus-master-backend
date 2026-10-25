@@ -79,7 +79,7 @@
 3. **充值走模拟接口** `POST /payment/recharge/mock`，直接加分不扣钱，**不做真实微信支付**
 4. 积分取整用 `totalAmount.intValue()`（直接截断小数位，如 6.50 → 6）
 
-### 进度：第 1、2 块已完成，第 3–9 块待做
+### 进度：第 1–3 块已完成并验证；第 4 块已并入第 2 块；第 5–9 块待做
 
 **✅ 第 1 块：数据库 + 实体（已执行、已验证）**
 
@@ -91,7 +91,7 @@
 - `init.sql` 已同步（供全新导入用）；**存量库只跑迁移脚本，别拿 `init.sql` 覆盖**
 - 存量用户已补 100 积分（`UPDATE wallet SET points = 100 WHERE points = 0`，幂等）
 
-**✅ 第 2 块：`submit()` 改为积分冻结（代码已改，⚠️ 尚未编译验证）**
+**✅ 第 2 块：`submit()` 改为积分冻结（已编译、已验证，2026-10-25）**
 
 - 查 `wallet.points` → 不足抛「积分不足，请先接单赚取积分或去积分商店充值」
 - `points -= N`，`frozen_points += N`，写 `POINTS_FREEZE` 流水（`points = -N`）
@@ -100,9 +100,18 @@
 - **`submit()` 返回类型 `PayedVO` → `Long`**（`IOrderMainService` 和 `OrderController.add` 已同步改）
 - 顺手清理：`init.sql` 里 `capital_flow` 的 `跑腿id/跑腿收益` → `互助员id/互助员收益`
 
-**⏳ 待做**
+**✅ 第 3 块：注册赠送积分（已完成、已用集成测试验证，2026-10-25）**
 
-3. 配置项 `register-gift-points: 100` + `LoginService` 注册送 100 积分并写 `POINTS_GIFT` 流水
+- `WgConfig` 加 `registerGiftPoints`；`application.yml` 加 `wg.register-gift-points: 100`
+- 新增接口 `wg-system/.../service/IPointsService.java`（只声明 `grantRegisterGift(Long uid)`）
+- 新增实现 `wg-payment/.../service/impl/PointsServiceImpl.java`：读配置 → `wallet.points += N` → 写 `capital_flow`（`type=4 POINTS_GIFT`、`points=+N`、`user_id=uid`、`order_id=null`）
+- `LoginService.xcxLogin()` 在 `walletMapper.insert(wallet)` 之后调用 `pointsService.grantRegisterGift(uid)`
+- **为什么接口放 system、实现放 payment**：`wg-payment` 依赖 `wg-system`（反向依赖会循环）。`LoginService` 属于 system，只能面向 system 里的接口编程；实际 Bean 由 payment 提供，wg-admin 启动时全量扫描 `com.wg`，能装配上
+- 配置为 `0` 或负数 = 关闭赠送；PC 后台「新增用户」（`UserPcController.addAgent`）**不送**积分，只针对小程序自动注册
+- ⚠️ **顺带发现（延后到第 9 块处理）**：`CapitalFlowServiceImpl.listCurr()` 给小程序用户只按 `runner_id` 过滤，而积分流水（含第 2 块的 `POINTS_FREEZE`）记的是 `user_id` → **小程序资金明细里看不到积分流水**。第 9 块加积分类型 picker 时要把查询条件改成 `runner_id = uid OR user_id = uid`（或统一字段），否则 picker 选了积分类型也是空列表
+
+**⏳ 待做（第 4–9 块）**
+
 4. ~~订单状态机~~ 已并入第 2 块（`OrderStatus.PENDING_PAYMENT` 枚举值等残留，划入第 6/7 块清理）
 5. `confirm()` 验收划转：发布者 `frozen_points -=` → 接单者 `points +=`，写 `POINTS_RELEASE`；顺手删 `confirmTest()` 死代码
 6. `cancel()` 及相关共 **8 处** `payService.refund()` 改为「解冻退回积分」；手续费给接单者；写 `POINTS_REFUND`
@@ -143,12 +152,27 @@ SELECT id, reward_points, status FROM order_main ORDER BY create_time DESC LIMIT
 SELECT * FROM capital_flow ORDER BY id DESC LIMIT 1;                                -- type = 5, points = -6
 ```
 
+### 第 3 块的验证方法（已自动跑通，2026-10-25）
+
+> 从这一块开始，验证由 Claude 直接跑集成测试，不再让用户手工造新号。以后每块都按这个套路补一个 IT。
+
+- 测试类：`wg-campus/wg-admin/src/test/java/com/wg/web/RegisterGiftIT.java`
+- 做法：`@MockBean WxMaService` 让 `xcxLogin` 拿到固定 openid，走真实 HTTP + 真实 MySQL/Redis，断言钱包和流水，`@AfterEach` 清理测试账号
+- 覆盖：首次登录送 100 → 钱包 `points=100`、`frozen_points=0`、`capital_flow` 一条 `type=4 / points=+100 / order_id=NULL`；同 openid 再登录不重复赠送
+- 跑法（前提：MySQL + Redis 已启动）：
+  ```bash
+  mvn -Pit -pl wg-admin -am test -Dtest=RegisterGiftIT -Dsurefire.failIfNoSpecifiedTests=false
+  ```
+  `pom.xml` 里 surefire 默认 `<skip>true</skip>`（日常构建不跑测试），`-Pit` 是为此新增的测试 profile
+- 2026-10-25 实跑结果：`Tests run: 1, Failures: 0, Errors: 0`，测试数据已清理（库里无 `type=4` 流水残留）
+
 ### 改完要做的操作
 
 | 块 | 操作 |
 |---|---|
 | 第 1 块 | 跑 `migration_phase1_points.sql` → 重新构建 → 重启（**已完成**） |
 | 第 2 块 | 重新构建（`Build → Rebuild Project`）+ 重启后端；`pom.xml` 没动 → **不需要刷新 Maven**；本轮**无数据库改动** |
+| 第 3 块 | 重新构建 + 重启后端（改了 Java + `application.yml`）；`pom.xml` / 数据库都没动 |
 
 ## 待办
 
@@ -231,6 +255,7 @@ SELECT * FROM capital_flow ORDER BY id DESC LIMIT 1;                            
 - 启动 Redis：双击 `start.bat`（看到 `Ready to accept connections tcp` 就正常）
 - 启动小程序：HBuilderX 右键 `wg-campus-uni` → 运行到微信开发者工具
 - 数据库导入：IDEA 里打开 `init.sql`，右上角选 `campus_mutual_aid`，点绿色三角形执行
+- 集成测试（需 MySQL + Redis 已启动）：`mvn -Pit -pl wg-admin -am test -Dtest=<测试类> -Dsurefire.failIfNoSpecifiedTests=false`
 - 微信开发者工具登录过期：手动打开工具扫码登录
 
 ## 注意事项
@@ -263,13 +288,21 @@ SELECT * FROM capital_flow ORDER BY id DESC LIMIT 1;                            
 
 ### 完成
 - **第 1 块（已执行 + 已验证）**：`migration_phase1_points.sql` 已在库上跑成功。`wallet` 加 `points`/`frozen_points`、`order_main` 加 `reward_points`、`capital_flow` 加 `points`；`CapitalType` 加 `POINTS_*` 3–7；`Wallet`/`OrderMain`/`CapitalFlow` 三个实体同步；存量用户补 100 积分；`wallet.balance`/`withdrawn` 反了的注释已改对
-- **第 2 块（代码已改，⚠️ 尚未编译验证）**：`submit()` 改为「查积分 → 不足拦截 → 扣可用 / 加冻结 → 写 `POINTS_FREEZE` 流水 → 订单直接落 `PENDING_ACCEPTANCE`」；延时队列换成 `ORDER_PENDING_ACCEPT_CANCEL`；`submit()` 返回类型 `PayedVO` → `Long`
+- **第 2 块（已编译 + 已验证，2026-10-25）**：`submit()` 改为「查积分 → 不足拦截 → 扣可用 / 加冻结 → 写 `POINTS_FREEZE` 流水 → 订单直接落 `PENDING_ACCEPTANCE`」；延时队列换成 `ORDER_PENDING_ACCEPT_CANCEL`；`submit()` 返回类型 `PayedVO` → `Long`
 - 三个已确认的设计决策、第 3–9 块清单、中间态风险、验证 SQL → 全部记在上面「🔄 当前主线：积分体系改造」一节
 
+## 更新记录（2026-10-25 · 积分改造一期第 3 块）
+
+### 完成
+- **第 2 块验证通过**：发单后 `points -6 / frozen_points +6`，`capital_flow type=5, points=-6`，订单 `status=1`，取整正确
+- **第 3 块完成并自动验证通过**：注册送积分 + 配置项，`RegisterGiftIT` 实跑 `Tests run: 1, Failures: 0, Errors: 0`，测试账号已清理
+- **新增集成测试设施**：`-Pit` profile + `RegisterGiftIT`（mock 微信登录 → 真实 HTTP/MySQL/Redis → 断言 → 清理），以后每块照此补 IT，用户不用再手工验证
+- 发现并记下：小程序资金明细按 `runner_id` 过滤，看不到记在 `user_id` 上的积分流水，**延后到第 9 块一起修**
+
 ### 下次开工第一步
-1. `Build → Rebuild Project` + 重启后端（**第 2 块还没编译过**）
-2. 按「当前主线」里的验证方法发一单，确认 `points -6 / frozen_points +6 / capital_flow type=5` 正确
-3. 验证通过后进第 3 块：注册赠送 100 积分 + 配置项
+1. 直接进第 5 块：`confirm()` 验收划转（第 4 块已并入第 2 块）
+2. 实现后补一个 `ConfirmReleaseIT`（参考 `RegisterGiftIT`），用 Claude 直接跑通再交付
+3. 用户侧只需要 `Build → Rebuild Project` + 重启后端（第 3 块改了 Java + `application.yml`；**无数据库改动**）
 
 ### 遗留（本次没做，与积分改造无关）
 - `init.sql` 里还有约 15 处“跑腿”字样（`order_main.runner_id`、`school.profit_runner`、`statistics_daily`、`user_wx`、`perm` 表的菜单名等）。本次只按需清理了 `capital_flow` 的两处，其余未动

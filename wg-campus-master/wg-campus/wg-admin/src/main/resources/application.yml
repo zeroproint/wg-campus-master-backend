@@ -20,6 +20,8 @@ wg:
   credit-deduction: 1
   # 用户地址上限
   max-address: 20
+  # 注册赠送积分
+  register-gift-points: 100
 email:
   host: smtp.qq.com #邮箱服务器
   port: 465 #端口

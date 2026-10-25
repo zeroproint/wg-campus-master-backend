@@ -63,4 +63,9 @@ public class WgConfig {
      * 用户地址上限
      */
     private Integer maxAddress;
+
+    /**
+     * 注册赠送积分
+     */
+    private Integer registerGiftPoints;
 }

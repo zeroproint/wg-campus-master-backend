@@ -70,6 +70,21 @@
                 <logging.level>warn</logging.level>
             </properties>
         </profile>
+        <!-- 需要跑集成测试时加 -Pit，日常构建仍然跳过测试 -->
+        <profile>
+            <id>it</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <skip>false</skip>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
     </profiles>
 
     <!-- 依赖声明 -->
