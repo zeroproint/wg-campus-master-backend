@@ -1,0 +1,6 @@
+Application Version: ${revision}
+Spring Boot Version: ${spring-boot.version}
+
+ ============================
+    Wg-Campus 微光校园互助
+ ============================

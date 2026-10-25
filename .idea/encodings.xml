@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="Encoding">
+    <file url="file://$PROJECT_DIR$/wg-campus-master/wg-campus/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wg-campus-master/wg-campus/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wg-campus-master/wg-campus/wg-admin/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wg-campus-master/wg-campus/wg-admin/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wg-campus-master/wg-campus/wg-common/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wg-campus-master/wg-campus/wg-common/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wg-campus-master/wg-campus/wg-framework/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wg-campus-master/wg-campus/wg-framework/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wg-campus-master/wg-campus/wg-order/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wg-campus-master/wg-campus/wg-order/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wg-campus-master/wg-campus/wg-oss/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wg-campus-master/wg-campus/wg-oss/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wg-campus-master/wg-campus/wg-payment/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wg-campus-master/wg-campus/wg-payment/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wg-campus-master/wg-campus/wg-system/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/wg-campus-master/wg-campus/wg-system/src/main/resources" charset="UTF-8" />
+  </component>
+</project>
